@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Jogo Pac-Man</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            background-color: #000;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #start-screen {
+            margin-top: 100px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        #game-canvas {
+            border: 2px solid #fff;
+            margin-top: 20px;
+        }
+
+        #score {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="start-screen">
+        <h1>Escolha seu personagem</h1>
+        <button onclick="startGame('pacman')">Pac-Man</button>
+        <button onclick="startGame('ghost')">Fantasminha</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div id="score">Pontuação: <span id="points">0</span></div>
+        <canvas id="game-canvas" width="480" height="312"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+
+        const sprites = {
+            pacman: new Image(),
+            ghost: new Image(),
+            dot: new Image()
+        };
+
+        sprites.pacman.src = 'assets/pacman.png';
+        sprites.ghost.src = 'assets/ghost.png';
+        sprites.dot.src = 'assets/dot.png';
+
+        let enemyMoveCounter = 0;
+        const enemyMoveDelay = 10; // Quanto maior, mais lento (ex: 10 = 1 movimento a cada 10 frames)
+
+        const tileSize = 24;
+        const wallColor = '#1a1a1a';
+        const map = [
+            "####################",
+            "#........##........#",
+            "#.####.#.##.####.#.#",
+            "#.#  #.#.##.#  #.#.#",
+            "#.####.#.##.####.#.#",
+            "#..................#",
+            "####.###.##.###.####",
+            "####.###.##.###.####",
+            "#........##........#",
+            "#.####.######.####.#",
+            "#.####.######.####.#",
+            "#..................#",
+            "####################"
+        ];
+
+        let score = 0;
+        let player, enemy, foods = [], playingAs = 'pacman';
+
+        function startGame(character) {
+            document.getElementById("start-screen").classList.add("hidden");
+            document.getElementById("game-screen").classList.remove("hidden");
+            playingAs = character;
+            initGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function initGame() {
+            score = 0;
+            document.getElementById("points").innerText = score;
+
+            // Posicionamento seguro baseado no personagem escolhido
+            if (playingAs === 'pacman') {
+                player = { x: 1, y: 1 };
+                enemy = { x: 18, y: 10 };
+            } else {
+                player = { x: 18, y: 10 };
+                enemy = { x: 1, y: 1 };
+            }
+
+            foods = [];
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    if (map[y][x] === '.') {
+                        foods.push({ x, y });
+                    }
+                }
+            }
+
+            window.addEventListener("keydown", handleKey);
+        }
+
+
+        function handleKey(e) {
+            let dx = 0, dy = 0;
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w': dy = -1; break;
+                case 'ArrowDown':
+                case 's': dy = 1; break;
+                case 'ArrowLeft':
+                case 'a': dx = -1; break;
+                case 'ArrowRight':
+                case 'd': dx = 1; break;
+            }
+            const nextX = player.x + dx;
+            const nextY = player.y + dy;
+            if (map[nextY]?.[nextX] !== '#') {
+                player.x = nextX;
+                player.y = nextY;
+            }
+        }
+
+        function drawTile(x, y, type) {
+            const img = sprites[type];
+            ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenhar mapa (paredes)
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    if (map[y][x] === '#') {
+                        ctx.fillStyle = wallColor;
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+
+            // Desenhar pontos
+            for (let i = foods.length - 1; i >= 0; i--) {
+                const f = foods[i];
+                drawTile(f.x, f.y, 'dot');
+                if (f.x === player.x && f.y === player.y) {
+                    foods.splice(i, 1);
+                    score++;
+                    document.getElementById("points").innerText = score;
+                }
+            }
+
+            // IA simples do inimigo (segue o jogador na horizontal/vertical)
+            enemyMoveCounter++;
+            if (enemyMoveCounter >= enemyMoveDelay) {
+                enemyMoveCounter = 0;
+
+                let dx = 0, dy = 0;
+                if (enemy.x < player.x) dx = 1;
+                else if (enemy.x > player.x) dx = -1;
+
+                if (dx !== 0 && map[enemy.y][enemy.x + dx] !== '#') {
+                    enemy.x += dx;
+                } else {
+                    if (enemy.y < player.y) dy = 1;
+                    else if (enemy.y > player.y) dy = -1;
+                    if (map[enemy.y + dy][enemy.x] !== '#') {
+                        enemy.y += dy;
+                    }
+                }
+            }
+
+
+
+            // Desenhar jogador e inimigo
+            drawTile(player.x, player.y, playingAs);
+            drawTile(enemy.x, enemy.y, playingAs === 'pacman' ? 'ghost' : 'pacman');
+
+            // Verificar colisão
+            if (enemy.x === player.x && enemy.y === player.y) {
+                setTimeout(() => {
+                    alert("Fim de jogo! Sua pontuação: " + score);
+                    location.reload();
+                }, 100);
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+
+</html>
